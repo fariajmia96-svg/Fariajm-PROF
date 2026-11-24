@@ -300,25 +300,25 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
   return (
     <section
       aria-label="Gráfica interactiva del ensayo de tracción"
-      className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden"
+      className="bg-white border border-slate-300 rounded-xl flex flex-col overflow-hidden text-sm font-bold text-slate-950"
     >
       {/* Top Bar: Chart Mode Switch & Analytical Tools */}
-      <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+      <div className="px-4 py-3 border-b border-slate-300 flex flex-wrap items-center justify-between gap-2.5">
         {/* Mode Segmented Control */}
         <div
           role="tablist"
           aria-label="Tipo de diagrama"
-          className="inline-flex items-center p-1 bg-slate-100 rounded-lg border border-slate-200/70"
+          className="inline-flex items-center p-1 bg-slate-200 rounded-lg border border-slate-300"
         >
           <button
             type="button"
             role="tab"
             aria-selected={chartMode === 'stress-strain'}
             onClick={() => onChangeChartMode('stress-strain')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
               chartMode === 'stress-strain'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-slate-950 shadow-xs'
+                : 'text-slate-900 hover:text-slate-950'
             }`}
           >
             Tensión – Deformación (σ – ε)
@@ -328,10 +328,10 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             role="tab"
             aria-selected={chartMode === 'force-elongation'}
             onClick={() => onChangeChartMode('force-elongation')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
               chartMode === 'force-elongation'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-slate-950 shadow-xs'
+                : 'text-slate-900 hover:text-slate-950'
             }`}
           >
             Fuerza – Alargamiento (F – ΔL)
@@ -344,13 +344,13 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             type="button"
             onClick={onToggleToughnessArea}
             aria-pressed={showToughnessArea}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold border transition-colors whitespace-nowrap cursor-pointer ${
               showToughnessArea
-                ? 'bg-blue-50 border-blue-200 text-blue-800'
-                : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-blue-100 border-blue-400 text-blue-950'
+                : 'bg-white border-slate-300 text-slate-950 hover:bg-slate-100'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-4 h-4" />
             Tenacidad (Área)
           </button>
 
@@ -358,13 +358,13 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             type="button"
             onClick={onToggleUnloadingGuide}
             aria-pressed={showUnloadingGuide}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold border transition-colors whitespace-nowrap cursor-pointer ${
               showUnloadingGuide
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-emerald-100 border-emerald-400 text-emerald-950'
+                : 'bg-white border-slate-300 text-slate-950 hover:bg-slate-100'
             }`}
           >
-            <TrendingDown className="w-3.5 h-3.5" />
+            <TrendingDown className="w-4 h-4" />
             Recta descarga (E)
           </button>
 
@@ -372,16 +372,16 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             type="button"
             onClick={() => setZoomElastic((z) => !z)}
             aria-pressed={zoomElastic}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold border transition-colors whitespace-nowrap cursor-pointer ${
               zoomElastic
-                ? 'bg-slate-900 border-slate-900 text-white'
-                : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                ? 'bg-slate-950 border-slate-950 text-white'
+                : 'bg-white border-slate-300 text-slate-950 hover:bg-slate-100'
             }`}
           >
             {zoomElastic ? (
-              <ZoomOut className="w-3.5 h-3.5" />
+              <ZoomOut className="w-4 h-4" />
             ) : (
-              <ZoomIn className="w-3.5 h-3.5" />
+              <ZoomIn className="w-4 h-4" />
             )}
             Zoom elástico
           </button>
@@ -390,10 +390,10 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             <button
               type="button"
               onClick={onClearReference}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold border border-amber-400 bg-amber-100 text-amber-950 hover:bg-amber-200 transition-colors whitespace-nowrap cursor-pointer"
               title="Quitar curva de referencia fijada"
             >
-              <PinOff className="w-3.5 h-3.5" />
+              <PinOff className="w-4 h-4" />
               Quitar ref.
             </button>
           ) : (
@@ -401,10 +401,10 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
               type="button"
               onClick={onPinReference}
               disabled={snapshot.maxStrainReached < 0.0002}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-bold border border-slate-300 bg-white text-slate-950 hover:bg-slate-100 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap cursor-pointer"
               title="Fija la curva actual para compararla tras cambiar D₀ o L₀"
             >
-              <Pin className="w-3.5 h-3.5" />
+              <Pin className="w-4 h-4" />
               Fijar ref.
             </button>
           )}
@@ -412,7 +412,7 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
       </div>
 
       {/* Pedagogical Context Sub-bar */}
-      <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+      <div className="px-4 py-2 bg-slate-100 border-b border-slate-300 flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-slate-950">
         <div className="flex items-center gap-2">
           {chartMode === 'stress-strain' ? (
             <>
@@ -424,12 +424,12 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
           ) : (
             <>
               <span>
-                Respuesta estructural de esta probeta: depende de S₀ ={' '}
-                <strong className="font-mono text-slate-800">
+                Respuesta de esta probeta: S₀ ={' '}
+                <strong className="font-mono text-slate-950">
                   {s0.toFixed(1)} mm²
                 </strong>{' '}
                 y L₀ ={' '}
-                <strong className="font-mono text-slate-800">
+                <strong className="font-mono text-slate-950">
                   {geometry.l0.toFixed(0)} mm
                 </strong>
               </span>
@@ -439,8 +439,8 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
         </div>
 
         {pinnedReference && (
-          <div className="font-mono text-[11px] text-amber-800">
-            Ref. fijada: {pinnedReference.materialName} (D₀=
+          <div className="font-mono text-sm font-bold text-amber-950">
+            Ref.: {pinnedReference.materialName} (D₀=
             {pinnedReference.d0.toFixed(1)} mm, L₀={pinnedReference.l0.toFixed(0)}{' '}
             mm)
           </div>
@@ -511,10 +511,11 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
                 />
                 <text
                   x={padLeft - 9}
-                  y={y + 3.5}
+                  y={y + 4}
                   textAnchor="end"
-                  fill="#475569"
-                  fontSize="10.5"
+                  fill="#020617"
+                  fontSize="11.5"
+                  fontWeight="700"
                   fontFamily="IBM Plex Mono, monospace"
                 >
                   {formatTick(val, yMax)}
@@ -533,15 +534,16 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
                   y1={padTop}
                   x2={x}
                   y2={padTop + plotH}
-                  stroke={i === 0 ? '#94A3B8' : '#E2E8F0'}
-                  strokeWidth={i === 0 ? '1' : '0.8'}
+                  stroke={i === 0 ? '#64748B' : '#CBD5E1'}
+                  strokeWidth={i === 0 ? '1.2' : '0.8'}
                 />
                 <text
                   x={x}
-                  y={padTop + plotH + 17}
+                  y={padTop + plotH + 18}
                   textAnchor="middle"
-                  fill="#475569"
-                  fontSize="10.5"
+                  fill="#020617"
+                  fontSize="11.5"
+                  fontWeight="700"
                   fontFamily="IBM Plex Mono, monospace"
                 >
                   {formatTick(val, xMax)}
@@ -555,9 +557,9 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             x={padLeft + plotW / 2}
             y={height - 10}
             textAnchor="middle"
-            fill="#0F172A"
-            fontSize="12"
-            fontWeight="600"
+            fill="#020617"
+            fontSize="13"
+            fontWeight="700"
             fontFamily="Plus Jakarta Sans, sans-serif"
           >
             {chartMode === 'stress-strain'
@@ -569,9 +571,9 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
             x={18}
             y={padTop + plotH / 2}
             textAnchor="middle"
-            fill="#0F172A"
-            fontSize="12"
-            fontWeight="600"
+            fill="#020617"
+            fontSize="13"
+            fontWeight="700"
             fontFamily="Plus Jakarta Sans, sans-serif"
             transform={`rotate(-90 18 ${padTop + plotH / 2})`}
           >
@@ -980,30 +982,30 @@ export const TensileChartPanel: React.FC<TensileChartPanelProps> = ({
         </svg>
       </div>
 
-      {/* Bottom Legend Strip (Zero-Pill Clean Metadata) */}
-      <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+      {/* Bottom Legend Strip */}
+      <div className="px-4 py-2.5 bg-slate-100 border-t border-slate-300 flex flex-wrap items-center justify-between gap-3 text-sm font-bold text-slate-950">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="w-3.5 h-0.5 inline-block rounded"
+              className="w-4 h-1 inline-block rounded"
               style={{ backgroundColor: material.visual.curveColor }}
             />
             Curva carga ({material.shortName})
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3.5 h-0.5 inline-block bg-emerald-600" />
+            <span className="w-4 h-1 inline-block bg-emerald-700" />
             Descarga paralela (E = {material.youngModulusGPa} GPa)
           </span>
           {pinnedReference && (
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-3.5 h-0.5 inline-block border-t-2 border-dashed border-amber-600" />
+              <span className="w-4 h-0.5 inline-block border-t-2 border-dashed border-amber-700" />
               Referencia fijada
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-          <span>{zoomElastic ? 'Escala ampliada (zona elástica)' : 'Escala completa'}</span>
+        <div className="flex items-center gap-1.5 font-mono text-sm font-bold text-slate-950">
+          <span>{zoomElastic ? 'Escala ampliada (elástica)' : 'Escala completa'}</span>
           <InfoTooltip glossaryKey="unloading" align="right" />
         </div>
       </div>

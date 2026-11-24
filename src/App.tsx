@@ -25,7 +25,10 @@ import {
 import { ControlInstrumentationPanel } from './components/ControlInstrumentationPanel';
 import { TheoryModal } from './components/TheoryModal';
 import { MaterialComparisonModal } from './components/MaterialComparisonModal';
-import { GeminiChatDrawer } from './components/GeminiChatDrawer';
+import {
+  GeminiChatDrawer,
+  SimulatorActionPayload,
+} from './components/GeminiChatDrawer';
 
 export default function App() {
   const [materialId, setMaterialId] = useState<MaterialId>('steel');
@@ -282,6 +285,140 @@ export default function App() {
     });
   }, [material, geometry, maxStrainReached, snapshot.s0]);
 
+  // Execute bidirectional simulator actions triggered by Gemini Function Calling
+  const handleApplySimulatorActions = useCallback(
+    (actions: SimulatorActionPayload): string => {
+      const notes: string[] = [];
+      let willReset = false;
+
+      if (actions.materialId && MATERIALS[actions.materialId]) {
+        setMaterialId(actions.materialId);
+        willReset = true;
+        notes.push(`Material: ${MATERIALS[actions.materialId].shortName}`);
+      }
+
+      if (typeof actions.d0 === 'number' || typeof actions.l0 === 'number') {
+        const nextD0 =
+          typeof actions.d0 === 'number'
+            ? Math.min(20, Math.max(6, Math.round(actions.d0 * 2) / 2))
+            : geometry.d0;
+        const nextL0 =
+          typeof actions.l0 === 'number'
+            ? Math.min(100, Math.max(30, Math.round(actions.l0)))
+            : geometry.l0;
+
+        setGeometry({ d0: nextD0, l0: nextL0 });
+        if (maxStrainReached > 0 || isFractured) {
+          willReset = true;
+        }
+        notes.push(`D₀ = ${nextD0} mm · L₀ = ${nextL0} mm`);
+      }
+
+      if (willReset) {
+        setIsPlaying(false);
+        setIsUnloadingAnim(false);
+        setCurrentStrain(0);
+        setMaxStrainReached(0);
+        setIsFractured(false);
+        setInspectionMode(false);
+      }
+
+      if (
+        actions.chartMode === 'stress-strain' ||
+        actions.chartMode === 'force-elongation'
+      ) {
+        setChartMode(actions.chartMode);
+        notes.push(
+          actions.chartMode === 'stress-strain'
+            ? 'Gráfica σ – ε'
+            : 'Gráfica F – ΔL'
+        );
+      }
+
+      if (typeof actions.showToughnessArea === 'boolean') {
+        setShowToughnessArea(actions.showToughnessArea);
+        notes.push(
+          actions.showToughnessArea
+            ? 'Área de tenacidad activada'
+            : 'Área de tenacidad oculta'
+        );
+      }
+
+      if (typeof actions.showUnloadingGuide === 'boolean') {
+        setShowUnloadingGuide(actions.showUnloadingGuide);
+        notes.push(
+          actions.showUnloadingGuide
+            ? 'Guía de descarga activada'
+            : 'Guía de descarga oculta'
+        );
+      }
+
+      if (typeof actions.inspectionMode === 'boolean') {
+        if (actions.inspectionMode && isFractured && !willReset) {
+          setInspectionMode(true);
+          notes.push('Calibrador post-rotura activado');
+        } else if (!actions.inspectionMode) {
+          setInspectionMode(false);
+          notes.push('Vista de máquina universal');
+        }
+      }
+
+      if (actions.action) {
+        switch (actions.action) {
+          case 'reset':
+            handleReset();
+            notes.push('Probeta reiniciada');
+            break;
+          case 'play':
+            if (isFractured && !willReset) {
+              setCurrentStrain(0);
+              setMaxStrainReached(0);
+              setIsFractured(false);
+              setInspectionMode(false);
+            }
+            setIsUnloadingAnim(false);
+            setIsPlaying(true);
+            notes.push('Ensayo automático iniciado');
+            break;
+          case 'pause':
+            setIsPlaying(false);
+            setIsUnloadingAnim(false);
+            notes.push('Ensayo pausado');
+            break;
+          case 'unload':
+            if (!isFractured && !willReset && snapshot.stress > 0.5) {
+              setIsPlaying(false);
+              setShowUnloadingGuide(true);
+              setIsUnloadingAnim(true);
+              notes.push('Descarga elástica iniciada (F → 0)');
+            }
+            break;
+          case 'pin_reference':
+            if (maxStrainReached >= 0.0002 && !willReset) {
+              handlePinReference();
+              notes.push('Curva fijada como referencia');
+            }
+            break;
+          case 'clear_reference':
+            setPinnedReference(null);
+            notes.push('Curva de referencia limpiada');
+            break;
+        }
+      }
+
+      return notes.join(' · ');
+    },
+    [
+      geometry.d0,
+      geometry.l0,
+      maxStrainReached,
+      isFractured,
+      snapshot.stress,
+      handleReset,
+      handlePinReference,
+    ]
+  );
+
   // Export CSV with real sampled tensile history
   const handleExportCsv = useCallback(() => {
     if (maxStrainReached < 1e-6) return;
@@ -364,11 +501,11 @@ export default function App() {
   }, [snapshot, material, geometry.l0]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F7FA] text-slate-900">
-      {/* Strict 3-Zone Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-8">
-          {/* Zone 1: Single-line Wordmark */}
+    <div className="min-h-screen flex flex-col bg-[#F5F7FA] text-slate-950 text-sm font-bold">
+      {/* Strict 3-Zone Top Navigation Bar with Official LUZ & Facultad de Ingeniería Logo */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-300">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
+          {/* Zone 1: Institutional LUZ + Facultad de Ingeniería Lockup & Brand */}
           <a
             href="#laboratorio"
             onClick={(e) => {
@@ -377,16 +514,27 @@ export default function App() {
               setCompareOpen(false);
               setChatOpen(false);
             }}
-            className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0"
-            style={{ fontFamily: 'var(--font-display)' }}
+            className="flex items-center gap-3 shrink-0"
           >
-            LabTracción FINGLUZ
+            <img
+              src="/assets/luz-fing-logo.png"
+              alt="Universidad del Zulia · Facultad de Ingeniería"
+              referrerPolicy="no-referrer"
+              className="h-10 sm:h-11 w-auto object-contain shrink-0"
+            />
+            <span className="h-8 w-px bg-slate-300 hidden sm:block shrink-0" />
+            <span
+              className="text-sm font-bold tracking-tight text-slate-950 whitespace-nowrap shrink-0"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              LabTracción FINGLUZ
+            </span>
           </a>
 
           {/* Zone 2: Clean single-line text navigation links */}
           <nav
             aria-label="Navegación principal"
-            className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600"
+            className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-950"
           >
             <button
               type="button"
@@ -395,9 +543,9 @@ export default function App() {
                 setCompareOpen(false);
                 setChatOpen(false);
               }}
-              className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`hover:text-blue-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 !theoryOpen && !compareOpen && !chatOpen
-                  ? 'text-slate-900 underline underline-offset-8 decoration-blue-700 decoration-2'
+                  ? 'text-slate-950 underline underline-offset-8 decoration-blue-800 decoration-2'
                   : ''
               }`}
             >
@@ -410,7 +558,7 @@ export default function App() {
                 setChatOpen(false);
                 setCompareOpen(true);
               }}
-              className="hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="hover:text-blue-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               Comparar materiales
             </button>
@@ -421,7 +569,7 @@ export default function App() {
                 setChatOpen(false);
                 setTheoryOpen(true);
               }}
-              className="hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="hover:text-blue-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               Guía teórica
             </button>
@@ -432,9 +580,9 @@ export default function App() {
                 setTheoryOpen(false);
                 setChatOpen(true);
               }}
-              className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`hover:text-blue-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 chatOpen
-                  ? 'text-blue-700 underline underline-offset-8 decoration-blue-700 decoration-2'
+                  ? 'text-blue-900 underline underline-offset-8 decoration-blue-800 decoration-2'
                   : ''
               }`}
             >
@@ -448,9 +596,9 @@ export default function App() {
               type="button"
               onClick={handleExportCsv}
               disabled={maxStrainReached < 1e-6}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-slate-950 rounded-lg hover:bg-slate-800 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-4 h-4" />
               Exportar CSV
             </button>
           </div>
@@ -458,7 +606,7 @@ export default function App() {
       </header>
 
       {/* Mobile Navigation Strip (visible only below md) */}
-      <div className="md:hidden bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-4 text-xs font-medium text-slate-600 overflow-x-auto">
+      <div className="md:hidden bg-white border-b border-slate-300 px-4 py-2 flex items-center gap-4 text-sm font-bold text-slate-950 overflow-x-auto">
         <button
           type="button"
           onClick={() => {
@@ -466,28 +614,28 @@ export default function App() {
             setCompareOpen(false);
             setChatOpen(false);
           }}
-          className="text-slate-900 font-semibold whitespace-nowrap shrink-0"
+          className="text-slate-950 font-bold whitespace-nowrap shrink-0"
         >
           Laboratorio
         </button>
         <button
           type="button"
           onClick={() => setCompareOpen(true)}
-          className="hover:text-slate-900 whitespace-nowrap shrink-0"
+          className="text-slate-950 hover:text-blue-900 whitespace-nowrap shrink-0"
         >
           Comparar materiales
         </button>
         <button
           type="button"
           onClick={() => setTheoryOpen(true)}
-          className="hover:text-slate-900 whitespace-nowrap shrink-0"
+          className="text-slate-950 hover:text-blue-900 whitespace-nowrap shrink-0"
         >
           Guía teórica
         </button>
         <button
           type="button"
           onClick={() => setChatOpen(true)}
-          className="text-blue-700 font-semibold whitespace-nowrap shrink-0"
+          className="text-blue-900 font-bold whitespace-nowrap shrink-0"
         >
           Tutor IA
         </button>
@@ -502,12 +650,12 @@ export default function App() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1
-              className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight"
+              className="text-sm font-bold text-slate-950 tracking-tight"
               style={{ textWrap: 'balance' }}
             >
               LabTracción FINGLUZ — Ensayo de Tracción en Probetas
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            <p className="text-sm font-bold text-slate-950 mt-0.5">
               Simulación cuasi-estática por desplazamiento controlado ·{' '}
               {material.name} ({material.standard})
             </p>
@@ -516,9 +664,9 @@ export default function App() {
           <button
             type="button"
             onClick={() => setChatOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white border border-blue-200 text-blue-800 hover:bg-blue-50 hover:border-blue-300 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-white border-2 border-blue-900 text-blue-950 hover:bg-blue-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <MessageSquare className="w-4 h-4" />
             Consultar con Tutor IA (Gemini)
           </button>
         </div>
@@ -550,16 +698,16 @@ export default function App() {
             />
 
             {/* Contextual Real-Time Observation Card */}
-            <div className="bg-white border border-slate-200 rounded-xl px-4 py-3.5">
+            <div className="bg-white border border-slate-300 rounded-xl px-4 py-3.5">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <h3 className="text-xs font-semibold text-slate-900">
+                <h3 className="text-sm font-bold text-slate-950">
                   Análisis físico en tiempo real
                 </h3>
-                <span className="text-xs text-slate-500 font-mono tabular-nums">
+                <span className="text-sm font-bold text-slate-950 font-mono tabular-nums">
                   {snapshot.phaseLabel}
                 </span>
               </div>
-              <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed">
+              <p className="text-sm font-bold text-slate-950 leading-relaxed">
                 {observationNote}
               </p>
             </div>
@@ -592,16 +740,21 @@ export default function App() {
       </main>
 
       {/* Clean Institutional Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-6">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
-          <p className="font-medium text-slate-800">
-            LabTracción FINGLUZ
-          </p>
-          <p className="text-center sm:text-right">
-            Desarrollado por el profesor ingeniero{' '}
-            <span className="font-semibold text-slate-900">
-              José Manuel Faría
+      <footer className="bg-white border-t border-slate-300 mt-6">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm font-bold text-slate-950">
+          <div className="flex items-center gap-3">
+            <img
+              src="/assets/luz-fing-logo.png"
+              alt="Universidad del Zulia · Facultad de Ingeniería"
+              referrerPolicy="no-referrer"
+              className="h-8 w-auto object-contain shrink-0"
+            />
+            <span className="text-sm font-bold text-slate-950">
+              LabTracción FINGLUZ
             </span>
+          </div>
+          <p className="text-center sm:text-right text-sm font-bold text-slate-950">
+            Desarrollado por el profesor ingeniero José Manuel Faría
           </p>
         </div>
       </footer>
@@ -625,6 +778,7 @@ export default function App() {
         inspectionMode={inspectionMode}
         showToughnessArea={showToughnessArea}
         pinnedReference={pinnedReference}
+        onApplySimulatorActions={handleApplySimulatorActions}
       />
     </div>
   );

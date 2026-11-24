@@ -2,13 +2,20 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import {
+  Content,
+  FunctionDeclaration,
+  GoogleGenAI,
+  ThinkingLevel,
+  Type,
+} from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
-const MODEL_NAME = 'gemini-4-hydrogen';
+const PRIMARY_MODEL = 'gemini-4-hydrogen';
+const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 
 interface ChatMessagePayload {
   role: 'user' | 'model';
@@ -62,17 +69,142 @@ interface LabContextPayload {
   pinnedReference: PinnedRefContext | null;
 }
 
-function buildSystemInstruction(ctx?: LabContextPayload): string {
-  const basePrompt = `Eres el profesor asistente de Ciencia de los Materiales del simulador **LabTracción FINGLUZ** (desarrollado por el Prof. Ing. José Manuel Faría).
+export interface SimulatorActionPayload {
+  materialId?: 'steel' | 'aluminum' | 'brass' | 'cast_iron';
+  d0?: number;
+  l0?: number;
+  action?:
+    | 'play'
+    | 'pause'
+    | 'unload'
+    | 'reset'
+    | 'pin_reference'
+    | 'clear_reference';
+  chartMode?: 'stress-strain' | 'force-elongation';
+  showToughnessArea?: boolean;
+  showUnloadingGuide?: boolean;
+  inspectionMode?: boolean;
+}
 
-Tu rol es ayudar a estudiantes de ingeniería respondiendo de forma **asertiva, clara, precisa y pedagógica** sobre el ensayo de tracción uniaxial y analizando directamente lo que está ocurriendo en la simulación en vivo.
+const controlSimulatorDeclaration: FunctionDeclaration = {
+  name: 'controlSimulator',
+  description:
+    'Controla directamente el simulador de ensayo de tracción LabTracción FINGLUZ cuando el estudiante pide cambiar el material, ajustar dimensiones D0/L0, iniciar o pausar el ensayo automático, descargar la fuerza a 0, reiniciar la probeta, cambiar el modo de gráfica (σ-ε o F-ΔL), sombrear la tenacidad, mostrar la recta de descarga elástica, fijar referencia o abrir el calibrador post-rotura.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      materialId: {
+        type: Type.STRING,
+        description:
+          'Material a montar en la máquina: "steel" (Acero A36), "aluminum" (Aluminio 6061-T6), "brass" (Latón C260) o "cast_iron" (Hierro fundido gris).',
+      },
+      d0: {
+        type: Type.NUMBER,
+        description:
+          'Diámetro inicial de la probeta en mm (entre 6 y 20, paso 0.5).',
+      },
+      l0: {
+        type: Type.NUMBER,
+        description:
+          'Longitud calibrada inicial en mm (entre 25 y 100, paso 5).',
+      },
+      action: {
+        type: Type.STRING,
+        description:
+          'Acción operativa sobre la máquina: "play" (iniciar ensayo automático), "pause" (pausar), "unload" (descargar fuerza a 0 siguiendo pendiente E), "reset" (reiniciar probeta), "pin_reference" (fijar curva actual como referencia), "clear_reference" (quitar curva de referencia).',
+      },
+      chartMode: {
+        type: Type.STRING,
+        description:
+          'Modo de diagrama a mostrar: "stress-strain" (σ vs ε) o "force-elongation" (F vs ΔL).',
+      },
+      showToughnessArea: {
+        type: Type.BOOLEAN,
+        description:
+          'Activa o desactiva el sombreado del área bajo la curva (tenacidad).',
+      },
+      showUnloadingGuide: {
+        type: Type.BOOLEAN,
+        description:
+          'Muestra u oculta la recta paralela de descarga elástica de pendiente E.',
+      },
+      inspectionMode: {
+        type: Type.BOOLEAN,
+        description:
+          'Activa el calibrador Vernier virtual post-rotura (solo cuando la probeta está fracturada).',
+      },
+    },
+  },
+};
+
+function sanitizeActions(
+  raw: Record<string, unknown> | undefined
+): SimulatorActionPayload | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: SimulatorActionPayload = {};
+
+  if (
+    raw.materialId === 'steel' ||
+    raw.materialId === 'aluminum' ||
+    raw.materialId === 'brass' ||
+    raw.materialId === 'cast_iron'
+  ) {
+    out.materialId = raw.materialId;
+  }
+
+  if (typeof raw.d0 === 'number' && Number.isFinite(raw.d0)) {
+    const clamped = Math.min(20, Math.max(6, Math.round(raw.d0 * 2) / 2));
+    out.d0 = clamped;
+  }
+
+  if (typeof raw.l0 === 'number' && Number.isFinite(raw.l0)) {
+    const clamped = Math.min(100, Math.max(25, Math.round(raw.l0 / 5) * 5));
+    out.l0 = clamped;
+  }
+
+  if (
+    raw.action === 'play' ||
+    raw.action === 'pause' ||
+    raw.action === 'unload' ||
+    raw.action === 'reset' ||
+    raw.action === 'pin_reference' ||
+    raw.action === 'clear_reference'
+  ) {
+    out.action = raw.action;
+  }
+
+  if (
+    raw.chartMode === 'stress-strain' ||
+    raw.chartMode === 'force-elongation'
+  ) {
+    out.chartMode = raw.chartMode;
+  }
+
+  if (typeof raw.showToughnessArea === 'boolean') {
+    out.showToughnessArea = raw.showToughnessArea;
+  }
+  if (typeof raw.showUnloadingGuide === 'boolean') {
+    out.showUnloadingGuide = raw.showUnloadingGuide;
+  }
+  if (typeof raw.inspectionMode === 'boolean') {
+    out.inspectionMode = raw.inspectionMode;
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function buildSystemInstruction(ctx?: LabContextPayload): string {
+  const basePrompt = `Eres el profesor asistente interactivo de Ciencia de los Materiales del simulador **LabTracción FINGLUZ** (Facultad de Ingeniería de la Universidad del Zulia, desarrollado por el Prof. Ing. José Manuel Faría).
+
+Tu rol es ayudar a estudiantes de ingeniería respondiendo de forma **asertiva, clara, precisa y pedagógica** sobre el ensayo de tracción uniaxial, analizando directamente los datos en vivo del simulador y ejecutando acciones mediante la herramienta controlSimulator cuando el estudiante te pida operar o configurar el ensayo.
 
 Reglas estrictas de estilo y formato:
 1. Responde siempre en español técnico claro, directo y bien estructurado.
 2. **NO uses sintaxis LaTeX** (nunca escribas signos de dólar $, ni \\sigma, \\varepsilon, \\Delta, \\text{}, \\frac{}). Usa directamente símbolos Unicode legibles: σ, ε, ΔL, S₀, D₀, L₀, L_f, D_f, S_f, σ_y, σ_R, E, A%, Z%, U_T, π, ×, ·, ≈, ≤, ≥, MPa, GPa, kN, mm, mm², MJ/m³, J.
-3. Sé asertivo y concreto: cuando el estudiante consulte sobre su ensayo, cita explícitamente los valores reales actuales de su probeta y explica la causa física (Ley de Hooke, movimiento de dislocaciones, conservación de volumen, endurecimiento por deformación, criterio de Considère / estricción, fractura copa-cono o fractura frágil plana por láminas de grafito).
-4. Mantén respuestas concisas y fáciles de leer (párrafos cortos o viñetas con negritas en los conceptos clave).
-5. Si el estudiante pregunta algo fuera de Ciencia de los Materiales o del ensayo de tracción, reconduce amablemente la conversación hacia el laboratorio.`;
+3. Sé asertivo y concreto: cuando el estudiante consulte sobre su ensayo, cita explícitamente los valores reales actuales de su probeta y explica la causa física (Ley de Hooke, movimiento de dislocaciones, conservación de volumen, endurecimiento por deformación, criterio de Considère / estricción, fractura copa-cono o fractura frágil plana).
+4. Si el estudiante pide cambiar material, cambiar D₀ o L₀, iniciar/pausar, descargar a 0, reiniciar, cambiar la gráfica (σ-ε / F-ΔL), sombrear la tenacidad o abrir el calibrador post-rotura, llama a la función controlSimulator y explica claramente qué debe observar el estudiante.
+5. Mantén respuestas concisas y fáciles de leer (párrafos cortos o viñetas con negritas en los conceptos clave).
+6. Si el estudiante pregunta algo fuera de Ciencia de los Materiales o del ensayo de tracción, reconduce amablemente la conversación hacia el laboratorio.`;
 
   if (!ctx) return basePrompt;
 
@@ -106,6 +238,39 @@ ${fractureLine}
 ${refLine}`;
 }
 
+function normalizeConversation(messages: ChatMessagePayload[]): Content[] {
+  const valid = messages
+    .filter(
+      (m): m is ChatMessagePayload =>
+        (m.role === 'user' || m.role === 'model') &&
+        typeof m.text === 'string' &&
+        m.text.trim().length > 0
+    )
+    .slice(-16);
+
+  let startIdx = 0;
+  while (startIdx < valid.length && valid[startIdx].role !== 'user') {
+    startIdx++;
+  }
+
+  const normalized: Array<{ role: 'user' | 'model'; text: string }> = [];
+  for (let i = startIdx; i < valid.length; i++) {
+    const item = valid[i];
+    const cleanText = item.text.trim().slice(0, 3000);
+    const prev = normalized[normalized.length - 1];
+    if (prev && prev.role === item.role) {
+      prev.text = `${prev.text}\n\n${cleanText}`.slice(0, 4000);
+    } else {
+      normalized.push({ role: item.role, text: cleanText });
+    }
+  }
+
+  return normalized.map((m) => ({
+    role: m.role,
+    parts: [{ text: m.text }],
+  }));
+}
+
 function getGenAIClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
@@ -121,79 +286,195 @@ function getGenAIClient(): GoogleGenAI {
   });
 }
 
-function isTransientError(err: unknown): boolean {
-  const status =
-    typeof err === 'object' && err !== null && 'status' in err
-      ? Number((err as { status?: number }).status)
-      : undefined;
-  if (status && (status === 429 || status >= 500)) return true;
-  const msg = err instanceof Error ? err.message : String(err);
-  return (
-    msg.includes('UNAVAILABLE') ||
-    msg.includes('DEADLINE_EXCEEDED') ||
-    msg.includes('ECONNRESET') ||
-    msg.includes('fetch failed')
-  );
+function getErrorStatus(err: unknown): number | undefined {
+  if (typeof err === 'object' && err !== null && 'status' in err) {
+    const num = Number((err as { status?: number }).status);
+    return Number.isFinite(num) ? num : undefined;
+  }
+  return undefined;
 }
 
-const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+function isRetryableError(err: unknown): boolean {
+  const status = getErrorStatus(err);
+  if (
+    status &&
+    (status === 429 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504)
+  ) {
+    return true;
+  }
+  if (err instanceof Error) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') return true;
+    const msg = err.message;
+    if (
+      msg.includes('UNAVAILABLE') ||
+      msg.includes('DEADLINE_EXCEEDED') ||
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('fetch failed') ||
+      msg.includes('EMPTY_MODEL_RESPONSE')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function callModelOnce(
   ai: GoogleGenAI,
   model: string,
-  sanitized: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
+  contents: Content[],
   systemInstruction: string,
-  timeoutMs: number
-): Promise<string> {
+  timeoutMs: number,
+  useLowThinking: boolean
+): Promise<{ reply: string; actions?: SimulatorActionPayload }> {
   const config: {
     systemInstruction: string;
     abortSignal: AbortSignal;
+    tools: Array<{ functionDeclarations: FunctionDeclaration[] }>;
     thinkingConfig?: { thinkingLevel: ThinkingLevel };
   } = {
     systemInstruction,
     abortSignal: AbortSignal.timeout(timeoutMs),
+    tools: [{ functionDeclarations: [controlSimulatorDeclaration] }],
   };
 
-  if (model === MODEL_NAME) {
+  if (useLowThinking && model === PRIMARY_MODEL) {
     config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
   }
 
   const response = await ai.models.generateContent({
     model,
-    contents: sanitized,
+    contents,
     config,
   });
 
-  const text = response.text?.trim();
-  if (!text) {
+  const functionCall = response.functionCalls?.find(
+    (fc) => fc.name === 'controlSimulator'
+  );
+  const actions = sanitizeActions(
+    functionCall?.args as Record<string, unknown> | undefined
+  );
+
+  let replyText = response.text?.trim() ?? '';
+
+  // If Gemini invoked controlSimulator without accompanying prose, complete turn 2 with functionResponse
+  if (functionCall && !replyText) {
+    const previousContent = response.candidates?.[0]?.content;
+    if (previousContent) {
+      const followUp = await ai.models.generateContent({
+        model,
+        contents: [
+          ...contents,
+          previousContent,
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  id: functionCall.id,
+                  name: functionCall.name,
+                  response: {
+                    status: 'applied',
+                    appliedActions: actions ?? {},
+                  },
+                },
+              },
+            ],
+          },
+        ],
+        config: {
+          systemInstruction,
+          abortSignal: AbortSignal.timeout(timeoutMs),
+          tools: [{ functionDeclarations: [controlSimulatorDeclaration] }],
+        },
+      });
+      replyText = followUp.text?.trim() ?? '';
+    }
+  }
+
+  if (!replyText && actions) {
+    replyText =
+      'He aplicado los ajustes solicitados directamente en el simulador LabTracción FINGLUZ. Observa la evolución de la probeta y el diagrama en tiempo real.';
+  }
+
+  if (!replyText) {
     throw new Error('EMPTY_MODEL_RESPONSE');
   }
-  return text;
+
+  return { reply: replyText, actions };
 }
 
-async function generateReplyWithRetry(
+async function generateReplyResilient(
   ai: GoogleGenAI,
-  sanitized: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>,
+  contents: Content[],
   systemInstruction: string
-): Promise<string> {
-  try {
-    return await callModelOnce(ai, MODEL_NAME, sanitized, systemInstruction, 12000);
-  } catch (err) {
-    const isTimeoutOrTransient =
-      isTransientError(err) ||
-      (err instanceof Error &&
-        (err.name === 'TimeoutError' || err.name === 'AbortError'));
-    if (!isTimeoutOrTransient) {
-      throw err;
+): Promise<{ reply: string; actions?: SimulatorActionPayload }> {
+  const schedule: Array<{
+    model: string;
+    timeoutMs: number;
+    useLowThinking: boolean;
+    delayBeforeMs: number;
+  }> = [
+    {
+      model: PRIMARY_MODEL,
+      timeoutMs: 12000,
+      useLowThinking: true,
+      delayBeforeMs: 0,
+    },
+    {
+      model: FALLBACK_MODEL,
+      timeoutMs: 12000,
+      useLowThinking: false,
+      delayBeforeMs: 600,
+    },
+    {
+      model: PRIMARY_MODEL,
+      timeoutMs: 14000,
+      useLowThinking: false,
+      delayBeforeMs: 1400,
+    },
+    {
+      model: FALLBACK_MODEL,
+      timeoutMs: 14000,
+      useLowThinking: false,
+      delayBeforeMs: 2600,
+    },
+  ];
+
+  let lastError: unknown;
+
+  for (const step of schedule) {
+    if (step.delayBeforeMs > 0) {
+      const jitter = Math.floor(Math.random() * 250);
+      await sleep(step.delayBeforeMs + jitter);
     }
-    return await callModelOnce(
-      ai,
-      FALLBACK_MODEL,
-      sanitized,
-      systemInstruction,
-      12000
-    );
+
+    try {
+      return await callModelOnce(
+        ai,
+        step.model,
+        contents,
+        systemInstruction,
+        step.timeoutMs,
+        step.useLowThinking
+      );
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableError(err)) {
+        break;
+      }
+    }
   }
+
+  throw lastError;
 }
 
 async function startServer() {
@@ -211,31 +492,15 @@ async function startServer() {
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
-    if (messages.length === 0) {
-      res.status(400).json({ error: 'Debe enviar al menos un mensaje.' });
-      return;
-    }
-
-    const sanitized = messages
-      .filter(
-        (m): m is ChatMessagePayload =>
-          (m.role === 'user' || m.role === 'model') &&
-          typeof m.text === 'string' &&
-          m.text.trim().length > 0
-      )
-      .slice(-16)
-      .map((m) => ({
-        role: m.role,
-        parts: [{ text: m.text.trim().slice(0, 3000) }],
-      }));
+    const contents = normalizeConversation(messages);
 
     if (
-      sanitized.length === 0 ||
-      sanitized[sanitized.length - 1].role !== 'user'
+      contents.length === 0 ||
+      contents[contents.length - 1].role !== 'user'
     ) {
       res
         .status(400)
-        .json({ error: 'El último mensaje debe ser del estudiante.' });
+        .json({ error: 'Debe enviar al menos una pregunta válida.' });
       return;
     }
 
@@ -252,17 +517,14 @@ async function startServer() {
 
     try {
       const systemInstruction = buildSystemInstruction(body.labContext);
-      const reply = await generateReplyWithRetry(
+      const result = await generateReplyResilient(
         ai,
-        sanitized,
+        contents,
         systemInstruction
       );
-      res.json({ reply });
+      res.json(result);
     } catch (err: unknown) {
-      const status =
-        typeof err === 'object' && err !== null && 'status' in err
-          ? Number((err as { status?: number }).status)
-          : undefined;
+      const status = getErrorStatus(err);
       const rawMessage = err instanceof Error ? err.message : String(err);
       console.error('[Gemini /api/chat error]', { status, rawMessage });
 
@@ -281,7 +543,15 @@ async function startServer() {
       if (status === 429 || rawMessage.includes('RESOURCE_EXHAUSTED')) {
         res.status(429).json({
           error:
-            'Se alcanzó el límite temporal de consultas a Gemini (cuota agotada). Espera unos segundos o revisa tu clave en Settings > Secrets.',
+            'Se alcanzó el límite temporal de consultas a Gemini (cuota agotada). Espera unos segundos o selecciona una clave con facturación en Settings > Secrets.',
+        });
+        return;
+      }
+
+      if (status === 503 || rawMessage.includes('UNAVAILABLE')) {
+        res.status(503).json({
+          error:
+            'El servicio de Gemini presenta alta demanda momentánea (503). Pulsa «Reintentar consulta» en unos segundos o usa una clave con facturación en Settings > Secrets.',
         });
         return;
       }
@@ -296,7 +566,7 @@ async function startServer() {
 
       res.status(502).json({
         error:
-          'No se pudo obtener respuesta del modelo Gemini en este momento. Intenta nuevamente.',
+          'No se pudo obtener respuesta del modelo Gemini en este momento. Pulsa «Reintentar consulta».',
       });
     }
   });

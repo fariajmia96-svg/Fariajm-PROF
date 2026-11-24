@@ -55,23 +55,23 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
         }}
         aria-label={`Información teórica sobre ${entry.title}`}
         aria-expanded={open}
-        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-400 hover:text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 transition-colors"
+        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-slate-900 hover:text-blue-900 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 transition-colors cursor-pointer"
       >
-        <HelpCircle className="w-3.5 h-3.5" />
+        <HelpCircle className="w-4 h-4" />
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-label={entry.title}
-          className={`absolute z-50 top-7 ${alignmentClass} w-72 sm:w-80 bg-white border border-slate-200 rounded-lg shadow-lg p-3.5 text-left`}
+          className={`absolute z-50 top-7 ${alignmentClass} w-72 sm:w-80 bg-white border border-slate-400 rounded-lg shadow-lg p-4 text-left text-sm font-bold text-slate-950`}
         >
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <div className="text-xs font-medium text-blue-700 font-mono">
+              <div className="text-sm font-bold text-blue-900 font-mono">
                 {entry.symbol} · {entry.units}
               </div>
-              <h4 className="text-sm font-semibold text-slate-900 leading-snug mt-0.5">
+              <h4 className="text-sm font-bold text-slate-950 leading-snug mt-0.5">
                 {entry.title}
               </h4>
             </div>
@@ -79,17 +79,17 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Cerrar explicación"
-              className="p-0.5 text-slate-400 hover:text-slate-700 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              className="p-0.5 text-slate-900 hover:text-slate-950 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200/80 rounded px-2.5 py-1.5 font-mono text-xs text-slate-900 mb-2">
+          <div className="bg-slate-100 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-sm font-bold text-slate-950 mb-2">
             {entry.formula}
           </div>
 
-          <p className="text-xs text-slate-600 leading-relaxed">
+          <p className="text-sm font-bold text-slate-950 leading-relaxed">
             {entry.summary}
           </p>
         </div>

@@ -369,17 +369,17 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
   return (
     <section
       aria-label="Máquina Universal de Ensayos"
-      className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden"
+      className="bg-white border border-slate-300 rounded-xl flex flex-col overflow-hidden text-sm font-bold text-slate-950"
     >
       {/* Panel Header */}
-      <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2">
+      <div className="px-4 py-3 border-b border-slate-300 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900 truncate">
+          <h2 className="text-sm font-bold text-slate-950 truncate">
             {inspectionMode
               ? 'Banco de Metrología Post-Rotura'
               : 'Máquina Universal de Ensayos'}
           </h2>
-          <p className="text-xs text-slate-500 truncate mt-0.5">
+          <p className="text-sm font-bold text-slate-950 truncate mt-0.5">
             {material.shortName} · D₀ = {geometry.d0.toFixed(1)} mm · L₀ ={' '}
             {geometry.l0.toFixed(0)} mm
           </p>
@@ -389,20 +389,20 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
           <button
             type="button"
             onClick={() => onToggleInspection(!inspectionMode)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               inspectionMode
-                ? 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-                : 'bg-blue-700 text-white hover:bg-blue-800'
+                ? 'bg-slate-200 text-slate-950 hover:bg-slate-300'
+                : 'bg-blue-800 text-white hover:bg-blue-900'
             }`}
           >
             {inspectionMode ? (
               <>
-                <Eye className="w-3.5 h-3.5" />
+                <Eye className="w-4 h-4" />
                 Vista máquina
               </>
             ) : (
               <>
-                <Ruler className="w-3.5 h-3.5" />
+                <Ruler className="w-4 h-4" />
                 Unir mitades y medir
               </>
             )}
@@ -776,34 +776,35 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
                 fill="#1D4ED8"
               />
 
-              {/* Live L readout pill-free label */}
+              {/* Live L readout label */}
               <rect
-                x={cx + shoulderHalfW + 28}
-                y={specimenMidY - 17}
-                width="62"
-                height="34"
+                x={cx + shoulderHalfW + 26}
+                y={specimenMidY - 19}
+                width="66"
+                height="38"
                 rx="3"
                 fill="#FFFFFF"
-                stroke="#CBD5E1"
-                strokeWidth="0.9"
+                stroke="#64748B"
+                strokeWidth="1.1"
               />
               <text
                 x={cx + shoulderHalfW + 59}
                 y={specimenMidY - 5}
                 textAnchor="middle"
-                fill="#475569"
-                fontSize="7.5"
+                fill="#020617"
+                fontSize="8.5"
+                fontWeight="700"
                 fontFamily="IBM Plex Mono, monospace"
               >
-                {isFractured ? 'L_f (unida)' : 'L actual'}
+                {isFractured ? 'L_f' : 'L actual'}
               </text>
               <text
                 x={cx + shoulderHalfW + 59}
-                y={specimenMidY + 9}
+                y={specimenMidY + 10}
                 textAnchor="middle"
-                fill="#0F172A"
-                fontSize="9.5"
-                fontWeight="600"
+                fill="#020617"
+                fontSize="10"
+                fontWeight="700"
                 fontFamily="IBM Plex Mono, monospace"
               >
                 {(isFractured
@@ -819,26 +820,27 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
                 y1={specimenMidY}
                 x2={cx - shoulderHalfW - 14}
                 y2={specimenMidY}
-                stroke={snapshot.neckingFactor > 0.05 ? '#D97706' : '#475569'}
-                strokeWidth="0.9"
+                stroke={snapshot.neckingFactor > 0.05 ? '#B45309' : '#020617'}
+                strokeWidth="1.1"
                 strokeDasharray="2 2"
               />
               <rect
-                x={cx - shoulderHalfW - 76}
-                y={specimenMidY - 17}
-                width="62"
-                height="34"
+                x={cx - shoulderHalfW - 78}
+                y={specimenMidY - 19}
+                width="66"
+                height="38"
                 rx="3"
                 fill="#FFFFFF"
-                stroke={snapshot.neckingFactor > 0.05 ? '#F59E0B' : '#CBD5E1'}
-                strokeWidth="0.9"
+                stroke={snapshot.neckingFactor > 0.05 ? '#B45309' : '#64748B'}
+                strokeWidth="1.1"
               />
               <text
                 x={cx - shoulderHalfW - 45}
                 y={specimenMidY - 5}
                 textAnchor="middle"
-                fill={snapshot.neckingFactor > 0.05 ? '#B45309' : '#475569'}
-                fontSize="7.5"
+                fill={snapshot.neckingFactor > 0.05 ? '#78350F' : '#020617'}
+                fontSize="8.5"
+                fontWeight="700"
                 fontFamily="IBM Plex Mono, monospace"
               >
                 {isFractured
@@ -849,11 +851,11 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
               </text>
               <text
                 x={cx - shoulderHalfW - 45}
-                y={specimenMidY + 9}
+                y={specimenMidY + 10}
                 textAnchor="middle"
-                fill="#0F172A"
-                fontSize="9.5"
-                fontWeight="600"
+                fill="#020617"
+                fontSize="10"
+                fontWeight="700"
                 fontFamily="IBM Plex Mono, monospace"
               >
                 {snapshot.centralDiameter.toFixed(2)} mm
@@ -878,28 +880,28 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
           /* === POST-FRACTURE VIRTUAL CALIPER INSPECTION BENCH === */
           <div className="w-full flex flex-col items-center">
             {/* Segmented switch: Measure Lf vs Measure Df */}
-            <div className="inline-flex items-center p-1 bg-slate-200/75 rounded-lg mb-3">
+            <div className="inline-flex items-center p-1 bg-slate-200 rounded-lg mb-3">
               <button
                 type="button"
                 onClick={() => setCaliperTarget('length')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                   caliperTarget === 'length'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-slate-950 shadow-xs'
+                    : 'text-slate-900 hover:text-slate-950'
                 }`}
               >
-                Medir longitud L_f (A%)
+                Medir L_f (A%)
               </button>
               <button
                 type="button"
                 onClick={() => setCaliperTarget('diameter')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                   caliperTarget === 'diameter'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white text-slate-950 shadow-xs'
+                    : 'text-slate-900 hover:text-slate-950'
                 }`}
               >
-                Medir diámetro D_f (Z%)
+                Medir D_f (Z%)
               </button>
             </div>
 
@@ -1197,22 +1199,22 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
             </svg>
 
             {/* Concise Post-Fracture Metrology Summary */}
-            <div className="w-full max-w-[335px] mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white border border-slate-200 rounded-lg p-2.5">
-                <div className="text-slate-500">Alargamiento A%</div>
-                <div className="font-mono font-semibold text-sm text-slate-900 tabular-nums mt-0.5">
+            <div className="w-full max-w-[335px] mt-3 grid grid-cols-2 gap-2 text-sm font-bold text-slate-950">
+              <div className="bg-white border border-slate-300 rounded-lg p-2.5">
+                <div className="text-slate-950">Alargamiento A%</div>
+                <div className="font-mono font-bold text-sm text-slate-950 tabular-nums mt-0.5">
                   {snapshot.elongationAPct.toFixed(2)} %
                 </div>
-                <div className="font-mono text-[11px] text-slate-500 mt-0.5 tabular-nums">
+                <div className="font-mono text-sm font-bold text-slate-900 mt-0.5 tabular-nums">
                   L_f = {snapshot.finalLengthLf.toFixed(2)} mm
                 </div>
               </div>
-              <div className="bg-white border border-slate-200 rounded-lg p-2.5">
-                <div className="text-slate-500">Estricción Z%</div>
-                <div className="font-mono font-semibold text-sm text-slate-900 tabular-nums mt-0.5">
+              <div className="bg-white border border-slate-300 rounded-lg p-2.5">
+                <div className="text-slate-950">Estricción Z%</div>
+                <div className="font-mono font-bold text-sm text-slate-950 tabular-nums mt-0.5">
                   {snapshot.reductionZPct.toFixed(2)} %
                 </div>
-                <div className="font-mono text-[11px] text-slate-500 mt-0.5 tabular-nums">
+                <div className="font-mono text-sm font-bold text-slate-900 mt-0.5 tabular-nums">
                   D_f = {snapshot.finalDiameterDf.toFixed(2)} mm
                 </div>
               </div>
@@ -1222,30 +1224,30 @@ export const TestingMachinePanel: React.FC<TestingMachinePanelProps> = ({
       </div>
 
       {/* Contextual Bottom Hint inside Machine Panel */}
-      <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-600 flex items-center justify-between gap-2">
+      <div className="px-4 py-2.5 bg-slate-100 border-t border-slate-300 text-sm font-bold text-slate-950 flex items-center justify-between gap-2">
         {isFractured ? (
-          <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            Ensayo completado. Inspecciona L_f y D_f o reinicia la probeta.
+          <span className="inline-flex items-center gap-1.5 text-emerald-900 font-bold">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Ensayo completado. Inspecciona L_f y D_f o reinicia.
           </span>
         ) : snapshot.phase === 'unloaded_plastic' ? (
           <span>
             Deformación residual permanente:{' '}
-            <strong className="font-mono text-slate-900">
+            <strong className="font-mono text-slate-950">
               +{(snapshot.residualStrain * geometry.l0).toFixed(2)} mm
             </strong>
           </span>
         ) : snapshot.phase === 'necking' ? (
-          <span className="text-amber-800 font-medium">
+          <span className="text-amber-950 font-bold">
             Estricción activa en la zona central (diámetro en reducción).
           </span>
         ) : (
           <span>
             S₀ ={' '}
-            <strong className="font-mono text-slate-900 tabular-nums">
+            <strong className="font-mono text-slate-950 tabular-nums">
               {snapshot.s0.toFixed(1)} mm²
             </strong>{' '}
-            · Deformación cuasi-estática controlada
+            · Control por desplazamiento
           </span>
         )}
       </div>

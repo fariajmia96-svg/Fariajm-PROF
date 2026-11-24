@@ -8,14 +8,34 @@ import {
   Loader2,
   Activity,
   RotateCw,
+  CheckCircle2,
 } from 'lucide-react';
 import { SimulationSnapshot } from '../physics/tensileEngine';
 import { ChartMode, PinnedReferenceCurve } from './TensileChartPanel';
+import { MaterialId } from '../physics/materials';
+
+export interface SimulatorActionPayload {
+  materialId?: MaterialId;
+  d0?: number;
+  l0?: number;
+  action?:
+    | 'play'
+    | 'pause'
+    | 'unload'
+    | 'reset'
+    | 'pin_reference'
+    | 'clear_reference';
+  chartMode?: ChartMode;
+  showToughnessArea?: boolean;
+  showUnloadingGuide?: boolean;
+  inspectionMode?: boolean;
+}
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
+  appliedSummary?: string;
 }
 
 interface GeminiChatDrawerProps {
@@ -26,18 +46,16 @@ interface GeminiChatDrawerProps {
   inspectionMode: boolean;
   showToughnessArea: boolean;
   pinnedReference: PinnedReferenceCurve | null;
+  onApplySimulatorActions: (actions: SimulatorActionPayload) => string;
 }
 
 const SUGGESTED_QUESTIONS = [
   'Analiza qué está ocurriendo ahora mismo en mi probeta',
+  'Cambia a Aluminio 6061, inicia el ensayo y explícame su rigidez',
   '¿Por qué desciende la tensión nominal durante la estricción?',
-  '¿Qué sucede si descargo la máquina en la zona plástica?',
-  '¿Por qué σ–ε es igual al cambiar D₀ y L₀, pero F–ΔL cambia?',
+  'Cambia a gráfica F–ΔL, sombrea la tenacidad y explica qué representa',
 ];
 
-/**
- * Cleans any accidental inline LaTeX tokens into crisp engineering Unicode notation.
- */
 function normalizeMathNotation(raw: string): string {
   return raw
     .replace(/\$\$([^$]+)\$\$/g, '$1')
@@ -60,9 +78,6 @@ function normalizeMathNotation(raw: string): string {
     .replace(/\\,/g, ' ');
 }
 
-/**
- * Lightweight, safe React formatter for basic markdown (headings, bold, inline code, bullet & numbered lists, paragraphs).
- */
 function renderFormattedMessage(rawText: string): React.ReactNode {
   const text = normalizeMathNotation(rawText);
   const lines = text.split('\n');
@@ -77,7 +92,7 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
         return (
           <strong
             key={`${keyPrefix}-${idx}`}
-            className="font-semibold text-slate-900"
+            className="font-bold text-slate-950 underline decoration-slate-400 underline-offset-2"
           >
             {token.slice(2, -2)}
           </strong>
@@ -87,7 +102,7 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
         return (
           <code
             key={`${keyPrefix}-${idx}`}
-            className="px-1 py-0.5 rounded bg-slate-100 font-mono text-[11px] text-blue-900"
+            className="px-1 py-0.5 rounded bg-slate-100 font-mono text-sm font-bold text-blue-950"
           >
             {token.slice(1, -1)}
           </code>
@@ -102,7 +117,7 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
   const flushLists = (keyIdx: number) => {
     if (ulItems.length > 0) {
       blocks.push(
-        <ul key={`ul-${keyIdx}`} className="list-disc pl-4 space-y-1 my-1.5">
+        <ul key={`ul-${keyIdx}`} className="list-disc pl-5 space-y-1.5 my-1.5">
           {ulItems.map((item, idx) => (
             <li key={`uli-${keyIdx}-${idx}`} className="leading-relaxed">
               {formatInline(item, `uli-${keyIdx}-${idx}`)}
@@ -114,7 +129,10 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
     }
     if (olItems.length > 0) {
       blocks.push(
-        <ol key={`ol-${keyIdx}`} className="list-decimal pl-4 space-y-1 my-1.5">
+        <ol
+          key={`ol-${keyIdx}`}
+          className="list-decimal pl-5 space-y-1.5 my-1.5"
+        >
           {olItems.map((item, idx) => (
             <li key={`oli-${keyIdx}-${idx}`} className="leading-relaxed">
               {formatInline(item, `oli-${keyIdx}-${idx}`)}
@@ -148,7 +166,7 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
       blocks.push(
         <div
           key={`h-${idx}`}
-          className="font-semibold text-slate-900 mt-2 mb-1 first:mt-0"
+          className="font-bold text-slate-950 mt-2 mb-1 first:mt-0"
         >
           {formatInline(headingText, `h-${idx}`)}
         </div>
@@ -156,7 +174,10 @@ function renderFormattedMessage(rawText: string): React.ReactNode {
       return;
     }
     blocks.push(
-      <p key={`p-${idx}`} className="leading-relaxed my-1.5 first:mt-0 last:mb-0">
+      <p
+        key={`p-${idx}`}
+        className="leading-relaxed my-1.5 first:mt-0 last:mb-0"
+      >
         {formatInline(trimmed, `p-${idx}`)}
       </p>
     );
@@ -174,12 +195,13 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
   inspectionMode,
   showToughnessArea,
   pinnedReference,
+  onApplySimulatorActions,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'model',
-      text: 'Hola. Soy el asistente académico de **LabTracción FINGLUZ** conectado a Gemini. Veo en tiempo real los datos de tu probeta y puedo analizar la fase actual, explicar el diagrama σ–ε o F–ΔL y resolver tus dudas sobre el ensayo.',
+      text: 'Hola. Soy el asistente académico de **LabTracción FINGLUZ** conectado a Gemini. Analizo en tiempo real los datos de tu probeta y puedo operar el simulador (cambiar material, ajustar D₀/L₀, iniciar, descargar o cambiar la gráfica) cuando me lo pidas.',
     },
   ]);
   const [input, setInput] = useState('');
@@ -271,13 +293,15 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
       : null,
   });
 
-  const handleSend = async (overrideText?: string) => {
+  const handleSend = async (overrideText?: string, isRetry = false) => {
     const trimmed = (overrideText ?? input).trim();
     if (!trimmed || isStreaming) return;
 
     setErrorMsg(null);
     setLastFailedPrompt(null);
-    setInput('');
+    if (!isRetry) {
+      setInput('');
+    }
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -291,15 +315,23 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
       text: '',
     };
 
+    const baseMessages =
+      isRetry &&
+      messages.length > 0 &&
+      messages[messages.length - 1].role === 'user' &&
+      messages[messages.length - 1].text === trimmed
+        ? messages.slice(0, -1)
+        : messages;
+
     const historyForApi = [
-      ...messages.filter((m) => m.id !== 'welcome'),
+      ...baseMessages.filter((m) => m.id !== 'welcome'),
       userMsg,
     ].map((m) => ({
       role: m.role,
       text: m.text,
     }));
 
-    setMessages((prev) => [...prev, userMsg, placeholderModelMsg]);
+    setMessages([...baseMessages, userMsg, placeholderModelMsg]);
     setIsStreaming(true);
 
     const controller = new AbortController();
@@ -318,6 +350,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
 
       const data = (await response.json().catch(() => null)) as {
         reply?: string;
+        actions?: SimulatorActionPayload;
         error?: string;
       } | null;
 
@@ -333,9 +366,16 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
         );
       }
 
+      let appliedSummary: string | undefined;
+      if (data.actions) {
+        appliedSummary = onApplySimulatorActions(data.actions);
+      }
+
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === modelMsgId ? { ...m, text: data.reply ?? '' } : m
+          m.id === modelMsgId
+            ? { ...m, text: data.reply ?? '', appliedSummary }
+            : m
         )
       );
     } catch (err: unknown) {
@@ -366,7 +406,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
       {
         id: 'welcome',
         role: 'model',
-        text: 'Conversación reiniciada. ¿Qué duda tienes sobre el ensayo de tracción actual?',
+        text: 'Conversación reiniciada. ¿Qué duda tienes sobre el ensayo de tracción actual o qué acción deseas realizar en el simulador?',
       },
     ]);
   };
@@ -375,24 +415,24 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/35 flex justify-end"
+      className="fixed inset-0 z-50 bg-slate-950/40 flex justify-end text-sm font-bold text-slate-950"
       role="dialog"
       aria-modal="true"
       aria-label="Asistente académico con Gemini"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white h-full border-l border-slate-200 shadow-2xl flex flex-col"
+        className="w-full max-w-lg bg-white h-full border-l border-slate-300 shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between gap-2">
+        <div className="px-4 py-3.5 border-b border-slate-300 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-blue-700 shrink-0" />
+            <h2 className="text-sm font-bold text-slate-950 flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4 text-blue-800 shrink-0" />
               Tutor IA · Gemini
             </h2>
-            <p className="text-xs text-slate-500 truncate mt-0.5 font-mono tabular-nums">
+            <p className="text-sm font-bold text-slate-950 truncate mt-0.5 font-mono tabular-nums">
               {snapshot.material.shortName} · σ={snapshot.stress.toFixed(1)} MPa · ε=
               {(snapshot.strain * 100).toFixed(2)}%
             </p>
@@ -403,7 +443,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
               onClick={handleClear}
               title="Reiniciar conversación"
               aria-label="Reiniciar conversación"
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -411,7 +451,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Cerrar tutor IA"
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -419,12 +459,10 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
         </div>
 
         {/* Active Specimen Context Strip + Instant Analyze Action */}
-        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2">
-          <div className="min-w-0 text-[11px] text-slate-600">
-            <div className="font-medium text-slate-800 truncate">
-              {snapshot.phaseLabel}
-            </div>
-            <div className="font-mono text-slate-500 tabular-nums">
+        <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between gap-2">
+          <div className="min-w-0 text-sm font-bold text-slate-950">
+            <div className="truncate">{snapshot.phaseLabel}</div>
+            <div className="font-mono text-slate-900 tabular-nums">
               F={snapshot.forceKN.toFixed(2)} kN · D={snapshot.centralDiameter.toFixed(2)} mm
             </div>
           </div>
@@ -437,9 +475,9 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
                 'Analiza el estado actual de mi ensayo con los valores actuales de la probeta y explícame qué fenómeno físico está ocurriendo.'
               )
             }
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-white border border-blue-200 text-blue-800 hover:bg-blue-50 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-bold bg-blue-800 text-white hover:bg-blue-900 disabled:opacity-45 disabled:cursor-not-allowed transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Activity className="w-3.5 h-3.5" />
+            <Activity className="w-4 h-4" />
             Analizar estado
           </button>
         </div>
@@ -454,19 +492,27 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
                 className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[90%] rounded-xl px-3.5 py-2.5 text-xs ${
+                  className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-sm font-bold ${
                     isUser
-                      ? 'bg-blue-700 text-white'
-                      : 'bg-white border border-slate-200 text-slate-700'
+                      ? 'bg-blue-800 text-white'
+                      : 'bg-white border border-slate-300 text-slate-950'
                   }`}
                 >
                   {isUser ? (
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                   ) : msg.text ? (
-                    <div>{renderFormattedMessage(msg.text)}</div>
+                    <div className="space-y-2">
+                      {msg.appliedSummary && (
+                        <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-950 text-sm font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-800 shrink-0 mt-0.5" />
+                          <span>Acción aplicada: {msg.appliedSummary}</span>
+                        </div>
+                      )}
+                      <div>{renderFormattedMessage(msg.text)}</div>
+                    </div>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 text-slate-500">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="inline-flex items-center gap-1.5 text-slate-950">
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Analizando datos del simulador...
                     </span>
                   )}
@@ -478,38 +524,37 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
           {errorMsg && (
             <div
               role="alert"
-              className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 space-y-2"
+              className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm font-bold text-red-950 space-y-2"
             >
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+                <AlertCircle className="w-4 h-4 text-red-800 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
               {lastFailedPrompt && (
                 <button
                   type="button"
-                  onClick={() => handleSend(lastFailedPrompt)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white border border-red-200 text-red-800 font-medium hover:bg-red-100/60 transition-colors cursor-pointer"
+                  onClick={() => handleSend(lastFailedPrompt, true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-red-300 text-red-950 font-bold hover:bg-red-100 transition-colors cursor-pointer"
                 >
-                  <RotateCw className="w-3 h-3" />
+                  <RotateCw className="w-4 h-4" />
                   Reintentar consulta
                 </button>
               )}
             </div>
           )}
 
-          {/* Suggested Starter Questions when conversation has just started */}
           {messages.length <= 1 && !isStreaming && (
-            <div className="pt-2 space-y-1.5">
-              <div className="text-[11px] font-medium text-slate-500">
+            <div className="pt-2 space-y-2">
+              <div className="text-sm font-bold text-slate-950">
                 Consultas sugeridas
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {SUGGESTED_QUESTIONS.map((q) => (
                   <button
                     key={q}
                     type="button"
                     onClick={() => handleSend(q)}
-                    className="text-left text-xs px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-800 hover:bg-blue-50/40 transition-colors cursor-pointer"
+                    className="text-left text-sm font-bold px-3 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-950 hover:border-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                   >
                     {q}
                   </button>
@@ -527,7 +572,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
             e.preventDefault();
             handleSend();
           }}
-          className="p-3 bg-white border-t border-slate-200"
+          className="p-3 bg-white border-t border-slate-300"
         >
           <div className="flex items-end gap-2">
             <textarea
@@ -541,15 +586,15 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
                   handleSend();
                 }
               }}
-              placeholder="Pregunta sobre los resultados, fórmulas o fase actual..."
+              placeholder="Pregunta sobre resultados o pide controlar el ensayo..."
               disabled={isStreaming}
-              className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 disabled:bg-slate-50"
+              className="flex-1 resize-none rounded-lg border border-slate-400 px-3 py-2 text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700 disabled:bg-slate-100"
             />
             <button
               type="submit"
               disabled={!input.trim() || isStreaming}
               aria-label="Enviar pregunta"
-              className="inline-flex items-center justify-center h-10 px-3.5 rounded-lg bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-45 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center h-11 px-4 rounded-lg bg-blue-800 text-white hover:bg-blue-900 disabled:opacity-45 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
             >
               {isStreaming ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -558,7 +603,7 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
               )}
             </button>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1.5">
+          <p className="text-sm font-bold text-slate-900 mt-1.5">
             Enter para enviar · Shift+Enter para salto de línea
           </p>
         </form>
