@@ -2,13 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import {
-  Content,
-  FunctionDeclaration,
-  GoogleGenAI,
-  ThinkingLevel,
-  Type,
-} from '@google/genai';
+import type { Content, FunctionDeclaration } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -480,6 +475,17 @@ async function generateReplyResilient(
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
+
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (_req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });

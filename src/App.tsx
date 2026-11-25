@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, MessageSquare } from 'lucide-react';
+import { Download, FileCode2, MessageSquare } from 'lucide-react';
 import { MATERIALS, MaterialId } from './physics/materials';
 import {
   SpecimenGeometry,
@@ -590,8 +590,26 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zone 3: Single Primary Action */}
+          {/* Zone 3: Download Presentation HTML & Export CSV Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {!(
+              typeof window !== 'undefined' &&
+              (
+                window as unknown as {
+                  __LABTRACCION_STANDALONE__?: boolean;
+                }
+              ).__LABTRACCION_STANDALONE__
+            ) && (
+              <a
+                href="/LabTraccion_FINGLUZ_Presentacion.html"
+                download="LabTraccion_FINGLUZ_Presentacion.html"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-bold text-slate-950 bg-white border-2 border-slate-950 rounded-lg hover:bg-slate-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Descargar el simulador completo en un solo archivo HTML portable para abrir en tu presentación"
+              >
+                <FileCode2 className="w-4 h-4" />
+                Descargar HTML
+              </a>
+            )}
             <button
               type="button"
               onClick={handleExportCsv}

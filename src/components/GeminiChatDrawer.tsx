@@ -338,7 +338,15 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
     abortRef.current = controller;
 
     try {
-      const response = await fetch('/api/chat', {
+      const standaloneApiBase =
+        typeof window !== 'undefined'
+          ? (
+              window as unknown as {
+                __LABTRACCION_API_BASE__?: string;
+              }
+            ).__LABTRACCION_API_BASE__ || ''
+          : '';
+      const response = await fetch(`${standaloneApiBase}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -382,8 +390,13 @@ export const GeminiChatDrawer: React.FC<GeminiChatDrawerProps> = ({
       if (err instanceof DOMException && err.name === 'AbortError') {
         return;
       }
-      const message =
-        err instanceof Error
+      const isOfflineStandalone =
+        typeof window !== 'undefined' &&
+        window.location.protocol === 'file:' &&
+        err instanceof TypeError;
+      const message = isOfflineStandalone
+        ? 'Modo presentación sin conexión: todo el simulador funciona al 100% de forma local, pero el Tutor IA requiere conexión a internet para consultar a Gemini.'
+        : err instanceof Error
           ? err.message
           : 'Error inesperado al consultar el asistente.';
       setErrorMsg(message);
